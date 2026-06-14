@@ -332,7 +332,7 @@ html, body {
   }
 })();
 </script>
-""", height=0, width=0)
+""", height=1, width=1)
 
 st.markdown("""
 <style>
@@ -534,3 +534,4 @@ if prompt:
         st.session_state.history.append(AIMessage(content=reply))
         save_memory(st.session_state.history)
         st.rerun()
+         
