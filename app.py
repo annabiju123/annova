@@ -255,18 +255,7 @@ div[data-testid="stChatMessage"] div {
     background: rgba(255,215,0,0.18);
     border-radius: 4px;
 }
-#annova-space-bg {
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    width: 100vw !important;
-    height: 100vh !important;
-    z-index: 0 !important;
-}
 
-.stApp {
-    z-index: 1 !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -278,8 +267,13 @@ div[data-testid="stChatMessage"] div {
 components.html("""
 <script>
 (function () {
-  const topDoc = document;
-const topWin = window;
+  let topDoc, topWin;
+  try {
+    topWin = window.parent.parent; topDoc = topWin.document; topDoc.body;
+  } catch(e) {
+    try { topWin = window.parent; topDoc = topWin.document; topDoc.body; }
+    catch(e2) { topWin = window; topDoc = document; }
+  }
 
   const old = topDoc.getElementById('annova-space-bg');     if (old) old.remove();
   const oldS = topDoc.getElementById('annova-space-style'); if (oldS) oldS.remove();
@@ -595,4 +589,3 @@ if prompt:
         st.session_state.history.append(AIMessage(content=reply))
         save_memory(st.session_state.history)
         st.rerun()
-        
