@@ -261,100 +261,155 @@ div[data-testid="stChatMessage"] div {
 
 
 # ==============================================================================
-# NIGHT SKY BACKGROUND — pure CSS, deployment-safe (no iframe-breakout)
+# NIGHT SKY CANVAS BACKGROUND
 # ==============================================================================
 
 components.html("""
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  overflow: hidden;
-}
-
-#annova-star-field {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: linear-gradient(180deg, #03040f 0%, #070b1f 50%, #0a0e2a 100%);
-  z-index: -1;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.annova-star {
-  position: absolute;
-  border-radius: 50%;
-  background: #ffffff;
-  animation: annova-twinkle 3s infinite ease-in-out;
-}
-
-.annova-star.gold {
-  background: #ffd700;
-  box-shadow: 0 0 6px rgba(255,215,0,0.8);
-}
-
-.annova-star.white {
-  box-shadow: 0 0 6px rgba(255,255,255,0.8);
-}
-
-@keyframes annova-twinkle {
-  0%   { opacity: 0.15; transform: scale(0.8); }
-  50%  { opacity: 1;    transform: scale(1.2); }
-  100% { opacity: 0.15; transform: scale(0.8); }
-}
-</style>
-
-<div id="annova-star-field"></div>
-
 <script>
 (function () {
-  const field = document.getElementById('annova-star-field');
-  const STAR_COUNT = 150;
-
-  for (let i = 0; i < STAR_COUNT; i++) {
-    const star = document.createElement('div');
-    const isGold = Math.random() > 0.65;
-    const size = (Math.random() * 2.2 + 0.6).toFixed(1);
-
-    star.className = 'annova-star ' + (isGold ? 'gold' : 'white');
-    star.style.width = size + 'px';
-    star.style.height = size + 'px';
-    star.style.left = (Math.random() * 100) + 'vw';
-    star.style.top = (Math.random() * 100) + 'vh';
-    star.style.animationDelay = (Math.random() * 3) + 's';
-    star.style.animationDuration = (2 + Math.random() * 3) + 's';
-
-    field.appendChild(star);
+  let topDoc, topWin;
+  try {
+    topWin = window.parent.parent; topDoc = topWin.document; topDoc.body;
+  } catch(e) {
+    try { topWin = window.parent; topDoc = topWin.document; topDoc.body; }
+    catch(e2) { topWin = window; topDoc = document; }
   }
+
+  const old = topDoc.getElementById('annova-space-bg');     if (old) old.remove();
+  const oldS = topDoc.getElementById('annova-space-style'); if (oldS) oldS.remove();
+
+  const style = topDoc.createElement('style');
+  style.id = 'annova-space-style';
+  style.textContent = `
+    html, body { background: #03040f !important; }
+    .stApp, .main, [data-testid="stAppViewContainer"],
+    [data-testid="stBottom"], [data-testid="stBottomBlockContainer"],
+    [data-testid="stChatInputContainer"], div.stChatFloatingInputContainer
+    { background: transparent !important; }
+    [data-testid="stBottom"] > div,
+    [data-testid="stBottom"] > div > div,
+    [data-testid="stBottomBlockContainer"] > div
+    { background: transparent !important; box-shadow: none !important; }
+    .stApp { position: relative !important; z-index: 2 !important; }
+    [data-testid="stAppViewContainer"],
+    [data-testid="stSidebar"] { position: relative !important; z-index: 2 !important; }
+    [data-testid="stSidebar"] {
+      display: block !important;
+      visibility: visible !important;
+      width: 270px !important;
+      min-width: 270px !important;
+      background: rgba(6,6,20,0.95) !important;
+      border-right: 1px solid rgba(255,215,0,0.18) !important;
+    }
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] {
+      display: none !important;
+    }
+    [data-testid="stHeader"] { background: transparent !important; }
+    #annova-space-bg {
+      position: fixed !important; top:0; left:0;
+      z-index: 0 !important; pointer-events: none !important;
+    }
+  `;
+  topDoc.head.appendChild(style);
+
+  const canvas = topDoc.createElement('canvas');
+  canvas.id = 'annova-space-bg';
+  topDoc.body.prepend(canvas);
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width  = topWin.innerWidth;
+    canvas.height = topWin.innerHeight;
+    canvas.style.width  = canvas.width  + 'px';
+    canvas.style.height = canvas.height + 'px';
+  }
+  resize();
+  topWin.addEventListener('resize', resize);
+
+  const W = () => canvas.width, H = () => canvas.height;
+  const rand = (a,b) => a + Math.random()*(b-a);
+  let t = 0;
+
+  const blobs = [240,220,260].map(hue => ({
+    rx: rand(.05,.95), ry: rand(.05,.95),
+    r: rand(180,420), hue, phase: rand(0,Math.PI*2)
+  }));
+
+  function drawSky() {
+    const g = ctx.createLinearGradient(0,0,0,H());
+    g.addColorStop(0,'#03040f'); g.addColorStop(.5,'#070b1f'); g.addColorStop(1,'#0a0e2a');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W(),H());
+  }
+
+  function drawBlobs() {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    blobs.forEach(b => {
+      const cx = (b.rx + Math.sin(t*.3+b.phase)*.05)*W();
+      const cy = (b.ry + Math.cos(t*.25+b.phase)*.05)*H();
+      const g = ctx.createRadialGradient(cx,cy,0,cx,cy,b.r);
+      g.addColorStop(0,`hsla(${b.hue},60%,35%,.08)`);
+      g.addColorStop(.5,`hsla(${b.hue},60%,30%,.04)`);
+      g.addColorStop(1,`hsla(${b.hue},60%,30%,0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx,cy,b.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  function makeStar() {
+    return {
+      baseX: rand(0,W()), baseY: rand(0,H()), x:0, y:0,
+      size: rand(.6,2.6), opacity: rand(.1,.9),
+      twinkleSpeed: rand(.005,.025), twinkleDir: Math.random()>.5?1:-1,
+      angle: rand(0,Math.PI*2), angleSpeed: rand(.002,.006),
+      gold: Math.random()>.65, cross: Math.random()>.75
+    };
+  }
+
+  const stars = Array.from({length:220}, makeStar);
+
+  function drawCircleStar(s) {
+    const color = s.gold?'#ffd700':'#ffffff';
+    const rgb   = s.gold?'255,215,0':'255,255,255';
+    ctx.save();
+    ctx.globalAlpha = s.opacity*.3;
+    const g = ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.size*5);
+    g.addColorStop(0,`rgba(${rgb},1)`); g.addColorStop(1,`rgba(${rgb},0)`);
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(s.x,s.y,s.size*5,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=s.opacity; ctx.fillStyle=color;
+    ctx.shadowColor=color; ctx.shadowBlur=s.size*4;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCrossStar(s) {
+    const color=s.gold?'#ffd700':'#ffffff', r=s.size;
+    ctx.save(); ctx.globalAlpha=s.opacity; ctx.fillStyle=color;
+    ctx.shadowColor=color; ctx.shadowBlur=r*5;
+    ctx.beginPath(); ctx.arc(s.x,s.y,r*.65,0,Math.PI*2); ctx.fill();
+    ctx.fillRect(s.x-r*3.2, s.y-r*.28, r*6.4, r*.56);
+    ctx.fillRect(s.x-r*.28, s.y-r*3.2, r*.56, r*6.4);
+    ctx.restore();
+  }
+
+  function animate() {
+    if (!topDoc.body.contains(canvas)) return;
+    t+=.01; drawSky(); drawBlobs();
+    stars.forEach(s => {
+      s.angle += s.angleSpeed;
+      s.x = s.baseX + Math.sin(s.angle)*10;
+      s.y = s.baseY + Math.cos(s.angle)*10;
+      s.opacity += s.twinkleSpeed*s.twinkleDir;
+      if (s.opacity>=.95){s.opacity=.95;s.twinkleDir=-1;}
+      if (s.opacity<=.08){s.opacity=.08;s.twinkleDir=1;}
+      if (s.cross) drawCrossStar(s); else drawCircleStar(s);
+    });
+    topWin.requestAnimationFrame(animate);
+  }
+  animate();
 })();
 </script>
-""", height=1, width=1)
-
-st.markdown("""
-<style>
-/* Make the components.html iframe (holding the star field) cover the viewport */
-div[data-testid="stIFrame"] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    z-index: -1 !important;
-    pointer-events: none !important;
-    border: none !important;
-}
-
-div[data-testid="stIFrame"] iframe {
-    width: 100vw !important;
-    height: 100vh !important;
-    border: none !important;
-}
-</style>
-""", unsafe_allow_html=True)
+""", height=0, width=0)
 
 
 # ==============================================================================
@@ -534,4 +589,3 @@ if prompt:
         st.session_state.history.append(AIMessage(content=reply))
         save_memory(st.session_state.history)
         st.rerun()
-         
