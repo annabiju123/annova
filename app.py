@@ -255,7 +255,18 @@ div[data-testid="stChatMessage"] div {
     background: rgba(255,215,0,0.18);
     border-radius: 4px;
 }
+#annova-space-bg {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 0 !important;
+}
 
+.stApp {
+    z-index: 1 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -266,66 +277,145 @@ div[data-testid="stChatMessage"] div {
 
 components.html("""
 <script>
-const canvas = document.createElement("canvas");
-document.body.appendChild(canvas);
+(function () {
+  const topDoc = document;
+const topWin = window;
 
-canvas.style.position = "fixed";
-canvas.style.top = "0";
-canvas.style.left = "0";
-canvas.style.width = "100vw";
-canvas.style.height = "100vh";
-canvas.style.zIndex = "0";
-canvas.style.pointerEvents = "none";
+  const old = topDoc.getElementById('annova-space-bg');     if (old) old.remove();
+  const oldS = topDoc.getElementById('annova-space-style'); if (oldS) oldS.remove();
 
-const ctx = canvas.getContext("2d");
-
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-window.addEventListener("resize", resize);
-resize();
-
-let stars = Array.from({length: 150}, () => ({
-    x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
-    r: Math.random() * 1.5,
-    dx: (Math.random() - 0.5) * 0.2,
-    dy: (Math.random() - 0.5) * 0.2,
-    alpha: Math.random()
-}));
-
-function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "#03040f";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    for (let s of stars) {
-        s.x += s.dx;
-        s.y += s.dy;
-
-        if (s.x < 0 || s.x > canvas.width) s.dx *= -1;
-        if (s.y < 0 || s.y > canvas.height) s.dy *= -1;
-
-        s.alpha += (Math.random() - 0.5) * 0.05;
-        if (s.alpha < 0.2) s.alpha = 0.2;
-        if (s.alpha > 1) s.alpha = 1;
-
-        ctx.beginPath();
-        ctx.globalAlpha = s.alpha;
-        ctx.fillStyle = "white";
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fill();
+  const style = topDoc.createElement('style');
+  style.id = 'annova-space-style';
+  style.textContent = `
+    html, body { background: #03040f !important; }
+    .stApp, .main, [data-testid="stAppViewContainer"],
+    [data-testid="stBottom"], [data-testid="stBottomBlockContainer"],
+    [data-testid="stChatInputContainer"], div.stChatFloatingInputContainer
+    { background: transparent !important; }
+    [data-testid="stBottom"] > div,
+    [data-testid="stBottom"] > div > div,
+    [data-testid="stBottomBlockContainer"] > div
+    { background: transparent !important; box-shadow: none !important; }
+    .stApp { position: relative !important; z-index: 2 !important; }
+    [data-testid="stAppViewContainer"],
+    [data-testid="stSidebar"] { position: relative !important; z-index: 2 !important; }
+    [data-testid="stSidebar"] {
+      display: block !important;
+      visibility: visible !important;
+      width: 270px !important;
+      min-width: 270px !important;
+      background: rgba(6,6,20,0.95) !important;
+      border-right: 1px solid rgba(255,215,0,0.18) !important;
     }
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] {
+      display: none !important;
+    }
+    [data-testid="stHeader"] { background: transparent !important; }
+    #annova-space-bg {
+      position: fixed !important; top:0; left:0;
+      z-index: 0 !important; pointer-events: none !important;
+    }
+  `;
+  topDoc.head.appendChild(style);
 
-    ctx.globalAlpha = 1;
-    requestAnimationFrame(animate);
-}
+  const canvas = topDoc.createElement('canvas');
+  canvas.id = 'annova-space-bg';
+  topDoc.body.prepend(canvas);
+  const ctx = canvas.getContext('2d');
 
-animate();
+  function resize() {
+    canvas.width  = topWin.innerWidth;
+    canvas.height = topWin.innerHeight;
+    canvas.style.width  = canvas.width  + 'px';
+    canvas.style.height = canvas.height + 'px';
+  }
+  resize();
+  topWin.addEventListener('resize', resize);
+
+  const W = () => canvas.width, H = () => canvas.height;
+  const rand = (a,b) => a + Math.random()*(b-a);
+  let t = 0;
+
+  const blobs = [240,220,260].map(hue => ({
+    rx: rand(.05,.95), ry: rand(.05,.95),
+    r: rand(180,420), hue, phase: rand(0,Math.PI*2)
+  }));
+
+  function drawSky() {
+    const g = ctx.createLinearGradient(0,0,0,H());
+    g.addColorStop(0,'#03040f'); g.addColorStop(.5,'#070b1f'); g.addColorStop(1,'#0a0e2a');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W(),H());
+  }
+
+  function drawBlobs() {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    blobs.forEach(b => {
+      const cx = (b.rx + Math.sin(t*.3+b.phase)*.05)*W();
+      const cy = (b.ry + Math.cos(t*.25+b.phase)*.05)*H();
+      const g = ctx.createRadialGradient(cx,cy,0,cx,cy,b.r);
+      g.addColorStop(0,`hsla(${b.hue},60%,35%,.08)`);
+      g.addColorStop(.5,`hsla(${b.hue},60%,30%,.04)`);
+      g.addColorStop(1,`hsla(${b.hue},60%,30%,0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx,cy,b.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  function makeStar() {
+    return {
+      baseX: rand(0,W()), baseY: rand(0,H()), x:0, y:0,
+      size: rand(.6,2.6), opacity: rand(.1,.9),
+      twinkleSpeed: rand(.005,.025), twinkleDir: Math.random()>.5?1:-1,
+      angle: rand(0,Math.PI*2), angleSpeed: rand(.002,.006),
+      gold: Math.random()>.65, cross: Math.random()>.75
+    };
+  }
+
+  const stars = Array.from({length:220}, makeStar);
+
+  function drawCircleStar(s) {
+    const color = s.gold?'#ffd700':'#ffffff';
+    const rgb   = s.gold?'255,215,0':'255,255,255';
+    ctx.save();
+    ctx.globalAlpha = s.opacity*.3;
+    const g = ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.size*5);
+    g.addColorStop(0,`rgba(${rgb},1)`); g.addColorStop(1,`rgba(${rgb},0)`);
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(s.x,s.y,s.size*5,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=s.opacity; ctx.fillStyle=color;
+    ctx.shadowColor=color; ctx.shadowBlur=s.size*4;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCrossStar(s) {
+    const color=s.gold?'#ffd700':'#ffffff', r=s.size;
+    ctx.save(); ctx.globalAlpha=s.opacity; ctx.fillStyle=color;
+    ctx.shadowColor=color; ctx.shadowBlur=r*5;
+    ctx.beginPath(); ctx.arc(s.x,s.y,r*.65,0,Math.PI*2); ctx.fill();
+    ctx.fillRect(s.x-r*3.2, s.y-r*.28, r*6.4, r*.56);
+    ctx.fillRect(s.x-r*.28, s.y-r*3.2, r*.56, r*6.4);
+    ctx.restore();
+  }
+
+  function animate() {
+    if (!topDoc.body.contains(canvas)) return;
+    t+=.01; drawSky(); drawBlobs();
+    stars.forEach(s => {
+      s.angle += s.angleSpeed;
+      s.x = s.baseX + Math.sin(s.angle)*10;
+      s.y = s.baseY + Math.cos(s.angle)*10;
+      s.opacity += s.twinkleSpeed*s.twinkleDir;
+      if (s.opacity>=.95){s.opacity=.95;s.twinkleDir=-1;}
+      if (s.opacity<=.08){s.opacity=.08;s.twinkleDir=1;}
+      if (s.cross) drawCrossStar(s); else drawCircleStar(s);
+    });
+    topWin.requestAnimationFrame(animate);
+  }
+  animate();
+})();
 </script>
-""", height=0)
+""", height=0, width=0)
 
 
 # ==============================================================================
@@ -505,3 +595,4 @@ if prompt:
         st.session_state.history.append(AIMessage(content=reply))
         save_memory(st.session_state.history)
         st.rerun()
+        
