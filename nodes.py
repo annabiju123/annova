@@ -28,24 +28,3 @@ llm = ChatGroq(
     temperature=0.7
 )
 
-def get_graph():
-    def chatbot_node(state: ChatState):
-        messages = state["history"]
-
-        system_prompt = SystemMessage(
-            content="You are Annova, a helpful AI assistant."
-        )
-
-        response = llm.invoke([system_prompt] + messages)
-
-        return {"history": messages + [response]}
-
-    graph = StateGraph(ChatState)
-
-    graph.add_node("chatbot", chatbot_node)
-    graph.set_entry_point("chatbot")
-    graph.set_finish_point("chatbot")
-
-    return graph.compile()
-
-
