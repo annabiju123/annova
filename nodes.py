@@ -28,3 +28,18 @@ llm = ChatGroq(
     temperature=0.7
 )
 
+
+def chat_node(state: ChatState) -> ChatState:
+    history = state.get("history", [])
+    messages = [SystemMessage(content="You are a helpful personal assistant.")] + history
+    response = llm.invoke(messages)
+    return {"history": history + [response]}
+
+
+def get_graph():
+    builder = StateGraph(ChatState)
+    builder.add_node("chat", chat_node)
+    builder.set_entry_point("chat")
+    builder.set_finish_point("chat")
+    return builder.compile()
+
